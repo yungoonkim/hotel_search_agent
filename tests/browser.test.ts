@@ -1,0 +1,13 @@
+import { it,expect } from 'vitest';
+import { UnavailableBrowser,MockBrowser,BrowserError,enrichHotel,type BrowserRequest,type BrowserResult } from '../src/browser.js';
+import { normalize } from '../src/normalize.js';
+import { makeFixtures } from '../src/fixtures.js';
+import { analyze } from '../src/quality.js';
+const url='https://fixture.invalid/rooms';const sources=[{url,permissionReference:'synthetic test permission',reviewedAt:new Date().toISOString()}];
+const h=()=>normalize(makeFixtures(2)[1]!);
+const result=(r:BrowserRequest):BrowserResult=>({hotelId:r.hotelId,...(r.roomId?{roomId:r.roomId}:{}),extractedFields:r.roomId?{view:'ocean'}:{breakfast:false},sourceUrl:url,collectedAt:new Date().toISOString(),evidence:r.roomId?{view:'synthetic ocean'}:{breakfast:'synthetic no breakfast'}});
+it('MockBrowser returns traceable unverified facts, preserves verified fields',async()=>{const hotel=h();const {hotel:out,pending}=await enrichHotel(hotel,analyze(hotel),new MockBrowser(result),sources,[url]);expect(pending).toHaveLength(0);expect(out.attributes.breakfast).toMatchObject({value:false,status:'unverified'});expect(out.rooms[0]?.attributes.view?.evidence[0]?.url).toBe(url);expect(out.rooms[0]?.attributes.bathtub).toEqual(hotel.rooms[0]?.attributes.bathtub);});
+it('blocks unapproved URLs before any browser access',async()=>{let calls=0;const hotel=h();const out=await enrichHotel(hotel,analyze(hotel),new MockBrowser(r=>{calls++;return result(r);}),[],[url]);expect(calls).toBe(0);expect(out.pending[0]?.code).toBe('SOURCE_NOT_ALLOWED');});
+it.each(['UNAVAILABLE','ACCESS_DENIED','EXTRACTION_FAILED','NO_EVIDENCE'] as const)('handles %s as pending',async code=>{const hotel=h();const tool=code==='UNAVAILABLE'?new UnavailableBrowser():new MockBrowser(()=>{throw new BrowserError(code);});const out=await enrichHotel(hotel,analyze(hotel),tool,sources,[url]);expect(out.pending[0]?.code).toBe(code);});
+it('rejects mismatched entity, unauthorized result URL and unsupported values',async()=>{for(const patch of [{sourceUrl:'https://other.invalid'},{extractedFields:{breakfast:'yes'}},{hotelId:normalize(makeFixtures(1)[0]!).hotelId}]){const hotel=h();const out=await enrichHotel(hotel,analyze(hotel),new MockBrowser(r=>({...result(r),...patch})),sources,[url]);expect(out.pending.length).toBeGreaterThan(0);}});
+it('no evidence does not establish a fact',async()=>{const hotel=h();const out=await enrichHotel(hotel,analyze(hotel),new MockBrowser(r=>({...result(r),evidence:{}})),sources,[url]);expect(out.pending[0]?.code).toBe('NO_EVIDENCE');});

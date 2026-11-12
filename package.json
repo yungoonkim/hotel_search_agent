@@ -1,0 +1,31 @@
+{
+  "name": "hotel-data-collection-agent",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc --noEmit",
+    "test": "vitest run",
+    "demo": "node --import tsx src/cli.ts fixture",
+    "collect": "node --import tsx src/cli.ts live",
+    "export:csv": "node --import tsx src/export-cli.ts",
+    "migrate": "node --import tsx src/migrate.ts",
+    "test:postgres": "vitest run tests/postgres.test.ts"
+  },
+  "dependencies": {
+    "dotenv": "^16.6.1",
+    "pg": "^8.16.3",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "^22.18.0",
+    "@types/pg": "^8.15.5",
+    "typescript": "^5.9.2",
+    "tsx": "^4.20.5",
+    "vitest": "^3.2.4",
+    "@electric-sql/pglite": "^0.3.10"
+  }
+}
